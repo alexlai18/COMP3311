@@ -1,0 +1,77 @@
+#!/usr/bin/python3
+
+# COMP3311 22T3 Assignment 2
+# Print a list of character roles played by an actor/actress
+
+import sys
+import psycopg2
+from helpers import *
+
+### Globals
+
+db = psycopg2.connect(f"dbname=ass2")
+usage = f"Usage: {sys.argv[0]} FullName"
+
+### Command-line args
+
+if len(sys.argv) < 2:
+   print(usage)
+   exit(1)
+
+# process the command-line args ...
+
+### Queries
+
+### Manipulating database
+
+try:
+   cur = db.cursor()
+   name = sys.argv[1]
+
+   cur.execute(f'''SELECT DISTINCT pe.ID 
+                  FROM PEOPLE pe 
+                  WHERE pe.NAME = '{name}' ''')
+   id_list = cur.fetchall()
+
+   if not id_list:
+      print("No such person")
+
+   if len(id_list) == 1:
+      cur.execute(f'''SELECT DISTINCT pl.ROLE, m.YEAR, m.TITLE 
+                     FROM PRINCIPALS p 
+                        JOIN PEOPLE pe on (pe.ID = p.PERSON) 
+                        JOIN MOVIES m on (m.id = p.MOVIE) 
+                        JOIN PLAYSROLE pl on (pl.INMOVIE = p.ID) 
+                     WHERE (p.JOB = 'actor' or p.JOB = 'actress' or p.JOB = 'self') AND pe.ID = '{id_list[0][0]}' 
+                     ORDER BY m.YEAR, m.TITLE, pl.ROLE''')
+      role_list = cur.fetchall()
+      if not role_list:
+         print("No acting roles")
+      else:
+         for role in role_list:
+            print(role[0] + " in " + role[2] + " (" + str(role[1]) + ")")
+      exit(1)
+   else:
+      count = 1
+      for id in id_list:
+         cur.execute(f'''SELECT DISTINCT pl.ROLE, m.YEAR, m.TITLE 
+                        FROM PRINCIPALS p 
+                           JOIN PEOPLE pe on (pe.ID = p.PERSON) 
+                           JOIN MOVIES m on (m.id = p.MOVIE) 
+                           JOIN PLAYSROLE pl on (pl.INMOVIE = p.ID) 
+                        WHERE (p.JOB = 'actor' or p.JOB = 'actress' or p.JOB = 'self') AND pe.ID = '{id[0]}' ORDER BY m.YEAR, m.TITLE, pl.ROLE''')
+         role_list = cur.fetchall()
+         print(name + " #" + str(count))
+         if not role_list:
+            print("No acting roles")
+         else:
+            for role in role_list:
+               print(role[0] + " in " + role[2] + " (" + str(role[1]) + ")")
+         count += 1
+
+except Exception as err:
+   print("DB error: ", err)
+finally:
+   if db:
+      db.close()
+

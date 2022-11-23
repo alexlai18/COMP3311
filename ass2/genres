@@ -1,0 +1,67 @@
+#!/usr/bin/python3
+
+# COMP3311 22T3 Assignment 2
+# Print a list of countries where a named movie was released
+
+import sys
+import psycopg2
+from helpers import *
+
+
+### Globals
+
+db = psycopg2.connect(f"dbname=ass2")
+usage = f"Usage: {sys.argv[0]} Year"
+
+### Command-line args
+
+if len(sys.argv) < 2:
+   print(usage)
+   exit(1)
+
+# process the command-line args ...
+
+### Queries
+
+### Manipulating database
+
+try:
+   cur = db.cursor()
+   year = sys.argv[1]
+
+   if getYear(year) is None:
+      print("Invalid year")
+      exit(1)
+
+   cur.execute(f'''SELECT DISTINCT m.ID 
+                  FROM MOVIES m 
+                  WHERE m.YEAR = {year}''')
+   movies = cur.fetchall()
+
+   if not movies:
+      print("No movies")
+      exit(1)
+
+   cur.execute(f'''SELECT DISTINCT g.GENRE, COUNT(g.GENRE) 
+                  FROM MOVIEGENRES g 
+                     JOIN MOVIES m on (m.ID = g.MOVIE) 
+                  WHERE m.YEAR = {int(year)} 
+                  GROUP BY g.GENRE 
+                  ORDER BY COUNT(g.GENRE) DESC 
+                  FETCH FIRST 10 ROWS WITH TIES''')
+   genres = cur.fetchall()
+
+   if not genres:
+      print("No acting roles")
+   else:
+      size = len(str(genres[0][1]))
+      for genre in genres:
+         print(str(genre[1]).rjust(size, ' ') + " " + genre[0])
+
+
+except Exception as err:
+   print("DB error: ", err)
+finally:
+   if db:
+      db.close()
+

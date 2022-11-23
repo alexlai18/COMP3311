@@ -1,0 +1,87 @@
+#!/usr/bin/python3
+
+# COMP3311 22T3 Assignment 2
+# Print info about one movie; may need to choose
+
+import sys
+import psycopg2
+from helpers import *
+
+### Globals
+
+db = psycopg2.connect(f"dbname=ass2")
+usage = f"Usage: {sys.argv[0]} 'PartialMovieName'"
+
+### Command-line args
+
+if len(sys.argv) < 2:
+   print(usage)
+   exit(1)
+
+# process the command-line args ...
+
+### Queries
+
+### Manipulating database
+
+try:
+   cur = db.cursor()
+   lower_name = sys.argv[1].lower()
+   movie_id = None
+   # Choosing the movie
+   cur.execute(f'''SELECT DISTINCT m.TITLE, m.YEAR, m.ID 
+                  FROM MOVIES m WHERE lower(m.TITLE) LIKE '%{lower_name}%' 
+                  ORDER BY m.TITLE, m.YEAR''')
+   movie_list = cur.fetchall()
+
+   if not movie_list:
+      print(f"No movie matching: '{sys.argv[1]}'")
+      exit(1)
+
+
+   if len(movie_list) == 1:
+      print(movie_list[0][0] + " (" + str(movie_list[0][1]) + ")")
+      movie_id = movie_list[0][2]
+
+   else:
+      count = 1
+      for movie in movie_list:
+         print(str(count) + "." + " " + movie[0] + " (" + str(movie[1]) + ")")
+         count += 1
+      num = 0
+      num = int(input("Which movie? ")) - 1
+      movie = movie_list[num]
+      print(movie[0] + " (" + str(movie[1]) + ")")
+      movie_id = movie[2]
+
+   # Looking at the principals
+   cur.execute(f'''SELECT DISTINCT pe.NAME, p.JOB, p.ORD, p.ID 
+                  FROM PRINCIPALS p 
+                     JOIN PEOPLE pe on (pe.ID = p.PERSON) 
+                     JOIN MOVIES m on (m.ID = p.MOVIE) 
+                  WHERE m.ID = {movie_id} 
+                  ORDER BY p.ORD''')
+   principal_list = cur.fetchall()
+   
+   for principal in principal_list:
+      if principal[1] in ['actor', 'actress', 'self']:
+         cur.execute(f'''SELECT DISTINCT pl.ROLE 
+                        FROM PRINCIPALS p 
+                           JOIN PLAYSROLE pl on (pl.INMOVIE = p.ID) 
+                        WHERE p.ID = {principal[3]} 
+                        LIMIT 1''')
+         role = cur.fetchall()
+         if not role:
+            print(principal[0] + " plays ???")
+         else:
+            print(principal[0] + " plays " + role[0][0])
+      else:
+         print(principal[0] + ": " + principal[1])
+
+
+except Exception as err:
+   print("DB error: ", err)
+finally:
+   if db:
+      db.close()
+
